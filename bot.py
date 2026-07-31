@@ -230,11 +230,13 @@ async def user_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
     if step == "name":
+    USER_DATA[user_id]["name"] = update.message.text
 
-        USER_DATA[user_id]["name"] = update.message.text
+    await update.message.reply_text(
+        "Sila masukkan PIN 4 digit:"
+    )
 
-        await update.message.reply_text(
-            "Sila masukkan PIN 4 digit:"
+    USER_DATA[user_id]["step"] = "pin"
         )
 
         USER_DATA[user_id]["step"] = "pin"
@@ -311,7 +313,7 @@ Menunggu semakan bayaran
 
 
 
-async def main():
+def main():
 
     app = Application.builder().token(TOKEN).build()
 
