@@ -238,8 +238,6 @@ async def user_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     USER_DATA[user_id]["step"] = "pin"
 
-        USER_DATA[user_id]["step"] = "pin"
-
     elif step == "pin":
 
         USER_DATA[user_id]["pin"] = update.message.text
