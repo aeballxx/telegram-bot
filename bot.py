@@ -113,7 +113,7 @@ async def shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-        async def choose_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def choose_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     global order_id
 
