@@ -250,7 +250,7 @@ elif step == "pin":
 
     await show_payment(update.message)
 
-    elif step == "email":
+elif step == "email":
 
         USER_DATA[user_id]["email"] = update.message.text
 
