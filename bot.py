@@ -25,9 +25,9 @@ OWNER_ID = 7413570612
 PAYMENT = """
 💳 BAYARAN
 
-Bank:
-No Akaun:
-Nama:
+Bank: Maybank
+No Akaun: 1562 3535 2898
+Nama: Muhammad Iqbal Idaham
 
 Sila buat bayaran dan hantar bukti pembayaran.
 """
