@@ -228,7 +228,6 @@ async def user_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     step = USER_DATA[user_id].get("step")
 
-
 if step == "name":
 
     USER_DATA[user_id]["name"] = update.message.text
@@ -241,17 +240,15 @@ if step == "name":
 
 elif step == "pin":
 
-        USER_DATA[user_id]["pin"] = update.message.text
+    USER_DATA[user_id]["pin"] = update.message.text
 
-        USER_DATA[user_id]["step"] = "payment"
+    USER_DATA[user_id]["step"] = "payment"
 
-        await update.message.reply_text(
-            "Detail diterima ✅"
-        )
+    await update.message.reply_text(
+        "Detail diterima ✅"
+    )
 
-        await show_payment(update.message)
-
-
+    await show_payment(update.message)
 
     elif step == "email":
 
