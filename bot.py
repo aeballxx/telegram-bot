@@ -110,6 +110,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🔥 Selamat datang ke Premium Store\n\n"
         "Tekan butang untuk buat order.",
         reply_markup=InlineKeyboardMarkup(keyboard)
+    )
 
         # =====================
 # BUTTON PRODUK
