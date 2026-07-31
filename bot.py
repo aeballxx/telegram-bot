@@ -1,8 +1,12 @@
 import os
-import random
 from datetime import datetime
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import (
+    Update,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup
+)
+
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -15,416 +19,342 @@ from telegram.ext import (
 
 TOKEN = os.getenv("BOT_TOKEN")
 
-ADMIN_USERNAME = "@x_aebal"
+OWNER_ID = 7413570612
 
-
-# =====================
-# BAYARAN
-# =====================
 
 PAYMENT = """
 💳 BAYARAN
 
-Bank: 
+Bank:
 No Akaun:
-
 Nama:
 
 Sila buat bayaran dan hantar bukti pembayaran.
 """
 
 
-# =====================
-# PRODUK
-# =====================
-
-PRODUCTS = {
-
-    "netflix_private": {
+products = {
+    "np": {
         "name": "Netflix Private",
         "price": 12,
-        "detail": True,
-        "type": "name_pin"
+        "need": "namepin"
     },
-
-    "netflix_share": {
+    "ns": {
         "name": "Netflix Sharing",
         "price": 6,
-        "detail": False
+        "need": "none"
     },
-
-    "youtube_private": {
+    "yp": {
         "name": "YouTube Private",
         "price": 5,
-        "detail": True,
-        "type": "email"
+        "need": "email"
     },
-
-    "youtube_share": {
+    "ys": {
         "name": "YouTube Sharing",
         "price": 3,
-        "detail": True,
-        "type": "email"
+        "need": "email"
     },
-
-    "hbo_private": {
+    "hbo": {
         "name": "HBO Max Private",
         "price": 5,
-        "detail": True,
-        "type": "name_pin"
+        "need": "namepin"
     },
-
-    "prime_private": {
+    "prime": {
         "name": "Prime Video Private",
         "price": 5,
-        "detail": True,
-        "type": "name_pin"
+        "need": "namepin"
     }
-
 }
 
 
-ORDERS = {}
+orders = {}
+users = {}
 
-USER_STATE = {}
+order_number = 1000
 
-ORDER_NUMBER = 1000
-
-
-# =====================
-# START
-# =====================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = [
         [
             InlineKeyboardButton(
-                "🛒 Order Produk",
-                callback_data="products"
+                "🛒 Beli Produk",
+                callback_data="shop"
             )
         ]
     ]
 
     await update.message.reply_text(
-        "🔥 Selamat datang ke Premium Store\n\n"
-        "Tekan butang untuk buat order.",
+        "🔥 Premium Store\n\n"
+        "Selamat datang.\n"
+        "Tekan butang untuk beli.",
         reply_markup=InlineKeyboardMarkup(keyboard)
-    )
 
-        # =====================
-# BUTTON PRODUK
-# =====================
-
-async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    global ORDER_NUMBER
+        async def shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     query = update.callback_query
     await query.answer()
 
-    data = query.data
-    user = query.from_user
+    keyboard = []
 
-
-    # PAPAR PRODUK
-
-    if data == "products":
-
-        keyboard = []
-
-        for key, item in PRODUCTS.items():
-
-            keyboard.append(
-                [
-                    InlineKeyboardButton(
-                        f"{item['name']} RM{item['price']}",
-                        callback_data=key
-                    )
-                ]
-            )
-
-
-        await query.edit_message_text(
-            "🛒 Pilih produk:",
-            reply_markup=InlineKeyboardMarkup(keyboard)
+    for key, item in products.items():
+        keyboard.append(
+            [
+                InlineKeyboardButton(
+                    f"{item['name']} RM{item['price']}",
+                    callback_data=key
+                )
+            ]
         )
 
+    await query.edit_message_text(
+        "🛒 Pilih produk:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+
+async def product_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    global order_number
+
+    query = update.callback_query
+    await query.answer()
+
+    key = query.data
+    user = query.from_user
+
+    product = products[key]
+
+    order_id = order_number
+    order_number += 1
+
+
+    orders[order_id] = {
+        "user_id": user.id,
+        "username": user.username,
+        "product": product["name"],
+        "price": product["price"],
+        "detail": {}
+    }
+
+
+    users[user.id] = {
+        "order": order_id,
+        "step": "detail"
+    }
+
+
+    if product["need"] == "none":
+
+        users[user.id]["step"] = "payment"
+
+        await query.edit_message_text(
+            f"🧾 ORDER #{order_id}\n\n"
+            f"Produk: {product['name']}\n"
+            f"Harga: RM{product['price']}\n\n"
+            f"{PAYMENT}"
+        )
+
+
+    elif product["need"] == "email":
+
+        await query.edit_message_text(
+            f"🧾 ORDER #{order_id}\n\n"
+            f"Produk: {product['name']}\n"
+            f"Harga: RM{product['price']}\n\n"
+            "Sila masukkan email:"
+        )
+
+
+    else:
+
+        await query.edit_message_text(
+            f"🧾 ORDER #{order_id}\n\n"
+            f"Produk: {product['name']}\n"
+            f"Harga: RM{product['price']}\n\n"
+            "Sila masukkan nama:"
+        )
+
+
+
+async def text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    uid = update.message.from_user.id
+
+    if uid not in users:
         return
 
+    order_id = users[uid]["order"]
+    order = orders[order_id]
+
+    step = users[uid]["step"]
 
 
-    # PILIH PRODUK
-
-    if data in PRODUCTS:
-
-        product = PRODUCTS[data]
-
-        order_id = ORDER_NUMBER
-        ORDER_NUMBER += 1
-
-
-        ORDERS[order_id] = {
-            "user_id": user.id,
-            "username": user.username,
-            "product": product["name"],
-            "price": product["price"],
-            "detail": {}
-        }
-
-
-        USER_STATE[user.id] = {
-            "order_id": order_id,
-            "step": "detail"
-        }
-
-
-        if product["detail"]:
-
-            if product["type"] == "name_pin":
-
-                await query.edit_message_text(
-                    f"🧾 Order #{order_id}\n\n"
-                    f"Produk: {product['name']}\n"
-                    f"Harga: RM{product['price']}\n\n"
-                    "Sila masukkan nama pendek:"
-                )
-
-            elif product["type"] == "email":
-
-                await query.edit_message_text(
-                    f"🧾 Order #{order_id}\n\n"
-                    f"Produk: {product['name']}\n"
-                    f"Harga: RM{product['price']}\n\n"
-                    "Sila masukkan email:"
-                )
-
-        else:
-
-            await query.edit_message_text(
-                f"🧾 Order #{order_id}\n\n"
-                f"Produk: {product['name']}\n"
-                f"Harga: RM{product['price']}\n\n"
-                f"{PAYMENT}"
-            )
-
-            USER_STATE[user.id]["step"] = "payment"
-
-
-        return
-
-
-
-# =====================
-# INPUT CUSTOMER
-# =====================
-
-async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    user = update.message.from_user
-    uid = user.id
-
-    if uid not in USER_STATE:
-        return
-
-
-    state = USER_STATE[uid]
-    order_id = state["order_id"]
-
-    order = ORDERS[order_id]
-
-
-    if state["step"] == "detail":
-
-        product = order["product"]
-
+    if step == "detail":
 
         if "nama" not in order["detail"]:
 
             order["detail"]["nama"] = update.message.text
 
-
-            if "Netflix" in product or "HBO" in product or "Prime" in product:
-
-                await update.message.reply_text(
-                    "Sila masukkan PIN 4 digit:"
-                )
-
-            else:
+            if "YouTube" in order["product"]:
 
                 await update.message.reply_text(
                     "Sila buat bayaran.\n\n"
                     f"{PAYMENT}"
                 )
 
-                state["step"] = "payment"
+                users[uid]["step"] = "payment"
+
+            else:
+
+                await update.message.reply_text(
+                    "Sila masukkan PIN 4 digit:"
+                )
 
 
         else:
 
             order["detail"]["pin"] = update.message.text
 
+            users[uid]["step"] = "payment"
 
             await update.message.reply_text(
                 "Detail diterima.\n\n"
                 f"{PAYMENT}"
             )
 
-            state["step"] = "payment"
-
-
-        return
-
-# =====================
-# BUKTI BAYARAN
-# =====================
-
-async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    uid = update.message.from_user.id
-
-    if uid not in USER_STATE:
-        return
-
-    order_id = USER_STATE[uid]["order_id"]
-    order = ORDERS[order_id]
-
-
-    now = datetime.now()
-
-    text = (
-        "🔔 ORDER BARU\n\n"
-        f"ID: #{order_id}\n"
-        f"Produk: {order['product']}\n"
-        f"Harga: RM{order['price']}\n\n"
-        f"Nama: {order['detail'].get('nama','-')}\n"
-        f"PIN/Email: {order['detail'].get('pin','-')}\n\n"
-        f"Tarikh: {now.strftime('%d/%m/%Y')}\n"
-        f"Masa: {now.strftime('%H:%M')}\n\n"
-        f"Customer: @{order['username']}"
-    )
-
-
-    keyboard = [
-        [
-            InlineKeyboardButton(
-                "✅ Detail Dah Diberi",
-                callback_data=f"done_{order_id}"
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                "❌ Tolak",
-                callback_data=f"reject_{order_id}"
-            )
-        ]
-    ]
-
-
-    await context.bot.send_photo(
-        chat_id=ADMIN_USERNAME,
-        photo=update.message.photo[-1].file_id,
-        caption=text,
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
-
-
-    await update.message.reply_text(
-        "✅ Bukti bayaran diterima.\n"
-        "Sila tunggu pengesahan admin."
-    )
-
-
-
-# =====================
-# ADMIN BUTTON
-# =====================
-
-async def admin_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     query = update.callback_query
     await query.answer()
 
+    keyboard = []
 
-    if query.data.startswith("done_"):
-
-        order_id = query.data.split("_")[1]
-
-        order = ORDERS[int(order_id)]
-
-
-        await context.bot.send_message(
-            chat_id=order["user_id"],
-            text=(
-                "✅ ORDER SELESAI\n\n"
-                "Terima kasih kerana membeli bersama kami 🙏\n\n"
-                "Detail order anda telah diberikan."
-            )
+    for key, item in products.items():
+        keyboard.append(
+            [
+                InlineKeyboardButton(
+                    f"{item['name']} RM{item['price']}",
+                    callback_data=key
+                )
+            ]
         )
 
-
-        await query.edit_message_caption(
-            caption="✅ Selesai. Customer telah dimaklumkan."
-        )
-
-
-    elif query.data.startswith("reject_"):
-
-        order_id = query.data.split("_")[1]
-
-        order = ORDERS[int(order_id)]
-
-
-        await context.bot.send_message(
-            chat_id=order["user_id"],
-            text=(
-                "❌ Order ditolak.\n"
-                "Sila hubungi admin."
-            )
-        )
-
-
-        await query.edit_message_caption(
-            caption="❌ Order ditolak."
-        )
-
-
-
-# =====================
-# RUN BOT
-# =====================
-
-app = Application.builder().token(TOKEN).build()
-
-
-app.add_handler(CommandHandler("start", start))
-
-app.add_handler(
-    CallbackQueryHandler(buttons)
-)
-
-app.add_handler(
-    CallbackQueryHandler(admin_button)
-)
-
-app.add_handler(
-    MessageHandler(
-        filters.TEXT & ~filters.COMMAND,
-        message
+    await query.edit_message_text(
+        "🛒 Pilih produk:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
-)
 
-app.add_handler(
-    MessageHandler(
-        filters.PHOTO,
-        photo
+
+
+async def product_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    global order_number
+
+    query = update.callback_query
+    await query.answer()
+
+    key = query.data
+    user = query.from_user
+
+    product = products[key]
+
+    order_id = order_number
+    order_number += 1
+
+
+    orders[order_id] = {
+        "user_id": user.id,
+        "username": user.username,
+        "product": product["name"],
+        "price": product["price"],
+        "detail": {}
+    }
+
+
+    users[user.id] = {
+        "order": order_id,
+        "step": "detail"
+    }
+
+
+    if product["need"] == "none":
+
+        users[user.id]["step"] = "payment"
+
+        await query.edit_message_text(
+            f"🧾 ORDER #{order_id}\n\n"
+            f"Produk: {product['name']}\n"
+            f"Harga: RM{product['price']}\n\n"
+            f"{PAYMENT}"
+        )
+
+
+    elif product["need"] == "email":
+
+        await query.edit_message_text(
+            f"🧾 ORDER #{order_id}\n\n"
+            f"Produk: {product['name']}\n"
+            f"Harga: RM{product['price']}\n\n"
+            "Sila masukkan email:"
+        )
+
+
+    else:
+
+        await query.edit_message_text(
+            f"🧾 ORDER #{order_id}\n\n"
+            f"Produk: {product['name']}\n"
+            f"Harga: RM{product['price']}\n\n"
+            "Sila masukkan nama:"
+        )
+
+
+
+async def text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    uid = update.message.from_user.id
+
+    if uid not in users:
+        return
+
+    order_id = users[uid]["order"]
+    order = orders[order_id]
+
+    step = users[uid]["step"]
+
+
+    if step == "detail":
+
+        if "nama" not in order["detail"]:
+
+            order["detail"]["nama"] = update.message.text
+
+            if "YouTube" in order["product"]:
+
+                await update.message.reply_text(
+                    "Sila buat bayaran.\n\n"
+                    f"{PAYMENT}"
+                )
+
+                users[uid]["step"] = "payment"
+
+            else:
+
+                await update.message.reply_text(
+                    "Sila masukkan PIN 4 digit:"
+                )
+
+
+        else:
+
+            order["detail"]["pin"] = update.message.text
+
+            users[uid]["step"] = "payment"
+
+            await update.message.reply_text(
+                "Detail diterima.\n\n"
+                f"{PAYMENT}"
+            )
     )
-)
-
-
-print("BOT ONLINE")
-
-app.run_polling()
-
-
-    
