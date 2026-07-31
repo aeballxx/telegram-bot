@@ -1,5 +1,12 @@
 import os
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from datetime import datetime
+
+from telegram import (
+    Update,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup
+)
+
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -9,47 +16,61 @@ from telegram.ext import (
     filters
 )
 
+
 TOKEN = os.getenv("BOT_TOKEN")
+
 OWNER_ID = 7413570612
 
-ORDER_NUMBER = 1000
+
+orders = {}
+users = {}
+
+order_id = 1000
 
 
 PRODUCTS = {
-    "netflix_private": {
+    "np": {
         "name": "Netflix Private",
         "price": 12,
-        "detail": "pin"
+        "type": "pin"
     },
-    "netflix_sharing": {
+    "ns": {
         "name": "Netflix Sharing",
         "price": 6,
-        "detail": "none"
+        "type": "none"
     },
-    "youtube_private": {
+    "yp": {
         "name": "YouTube Private",
         "price": 5,
-        "detail": "email"
+        "type": "email"
     },
-    "youtube_sharing": {
+    "ys": {
         "name": "YouTube Sharing",
         "price": 3,
-        "detail": "email"
+        "type": "email"
     },
-    "hbo_private": {
+    "hbo": {
         "name": "HBO Max Private",
         "price": 5,
-        "detail": "pin"
+        "type": "pin"
     },
-    "prime_private": {
+    "prime": {
         "name": "Prime Video Private",
         "price": 5,
-        "detail": "pin"
+        "type": "pin"
     }
 }
 
 
-USER_DATA = {}
+BANK_INFO = """
+🏦 BANK
+
+Bank: Maybank
+No Akaun: 1562 3535 2898
+Nama: Muhammad Iqbal Idaham
+
+Sila pilih bayaran dan hantar bukti.
+"""
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -57,20 +78,20 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [
             InlineKeyboardButton(
-                "🛒 Order Produk",
-                callback_data="products"
+                "🛒 Beli Produk",
+                callback_data="shop"
             )
         ]
     ]
 
     await update.message.reply_text(
-        "🔥 Selamat datang ke Premium Store\n\n"
-        "Tekan butang untuk buat order.",
+        "🔥 Premium Store\n\n"
+        "Selamat datang.",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
 
-async def products(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     query = update.callback_query
     await query.answer()
@@ -78,73 +99,85 @@ async def products(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = []
 
     for key, item in PRODUCTS.items():
+        keyboard.append(
+            [
+                InlineKeyboardButton(
+                    f"{item['name']} RM{item['price']}",
+                    callback_data=key
+                )
+            ]
+        )
 
-        keyboard.append([
-            InlineKeyboardButton(
-                f"{item['name']} RM{item['price']}",
-                callback_data=key
-            )
-        ])
-
-
-    await query.message.reply_text(
-        "📦 Pilih produk:",
+    await query.edit_message_text(
+        "Pilih produk:",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
-
-
+    
 async def choose_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    global ORDER_NUMBER
+    global order_id
 
     query = update.callback_query
     await query.answer()
 
     product_id = query.data
+
+    if product_id not in PRODUCTS:
+        return
+
     product = PRODUCTS[product_id]
 
     user_id = query.from_user.id
 
-    ORDER_NUMBER += 1
+    order_id += 1
 
-    USER_DATA[user_id] = {
-        "order": ORDER_NUMBER,
+
+    orders[order_id] = {
+        "user_id": user_id,
         "product": product["name"],
         "price": product["price"],
-        "detail_type": product["detail"]
+        "detail": {}
+    }
+
+
+    users[user_id] = {
+        "order": order_id,
+        "step": product["type"]
     }
 
 
     await query.message.reply_text(
-        f"🧾 Order #{ORDER_NUMBER}\n\n"
+        f"🧾 ORDER #{order_id}\n\n"
         f"Produk: {product['name']}\n"
-        f"Harga: RM{product['price']}\n"
+        f"Harga: RM{product['price']}"
     )
 
 
-    if product["detail"] == "pin":
+    if product["type"] == "pin":
 
         await query.message.reply_text(
             "Sila masukkan nama pendek:"
         )
 
-        USER_DATA[user_id]["step"] = "name"
+        users[user_id]["step"] = "name"
 
 
-    elif product["detail"] == "email":
+    elif product["type"] == "email":
 
         await query.message.reply_text(
             "Sila masukkan email:"
         )
 
-        USER_DATA[user_id]["step"] = "email"
+        users[user_id]["step"] = "email"
 
 
     else:
 
-        await show_payment(query.message)
+        await payment_menu(query.message)
 
-async def show_payment(message):
+
+
+async def payment_menu(message):
 
     keyboard = [
         [
@@ -167,203 +200,184 @@ async def show_payment(message):
         ]
     ]
 
+
     await message.reply_text(
         "💳 Pilih cara bayaran:",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
-
-
 
 async def payment_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     query = update.callback_query
     await query.answer()
 
-
     if query.data == "bank":
 
         await query.message.reply_text(
-            """
-🏦 BAYARAN BANK
-
-Bank:
-No Akaun:
-Nama:
-
-Sila buat bayaran dan hantar bukti pembayaran 📸
-"""
+            BANK_INFO
         )
 
 
     elif query.data == "tng":
 
         await query.message.reply_text(
-            "🟩 QR Touch 'n Go\n"
-            "Sila scan QR di bawah."
+            "🟩 QR Touch 'n Go\n\n"
+            "Sila scan QR dan hantar bukti bayaran."
         )
 
-        # letak file_id gambar QR TNG nanti di sini
-        # await query.message.reply_photo("QR_TNG_FILE_ID")
+        # Nanti letak gambar QR TNG di sini
 
 
     elif query.data == "bisnes":
 
         await query.message.reply_text(
-            "🟦 QR Bisnes\n"
-            "Sila scan QR di bawah."
+            "🟦 QR Bisnes\n\n"
+            "Sila scan QR dan hantar bukti bayaran."
         )
 
-        # letak file_id gambar QR Bisnes nanti di sini
-        # await query.message.reply_photo("QR_BISNES_FILE_ID")
+        # Nanti letak gambar QR Bisnes di sini
 
 
 
-async def user_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.message.from_user.id
 
-    if user_id not in USER_DATA:
+    if user_id not in users:
         return
 
 
-    step = USER_DATA[user_id].get("step")
+    step = users[user_id]["step"]
 
-if step == "name":
+    order = orders[users[user_id]["order"]]
 
-    USER_DATA[user_id]["name"] = update.message.text
 
-    await update.message.reply_text(
-        "Sila masukkan PIN 4 digit:"
-    )
+    if step == "name":
 
-    USER_DATA[user_id]["step"] = "pin"
+        order["detail"]["name"] = update.message.text
 
-elif step == "pin":
+        users[user_id]["step"] = "pin"
 
-    USER_DATA[user_id]["pin"] = update.message.text
 
-    USER_DATA[user_id]["step"] = "payment"
+        await update.message.reply_text(
+            "Sila masukkan PIN 4 digit:"
+        )
 
-    await update.message.reply_text(
-        "Detail diterima ✅"
-    )
 
-    await show_payment(update.message)
+    elif step == "pin":
 
-elif step == "email":
+        order["detail"]["pin"] = update.message.text
 
-        USER_DATA[user_id]["email"] = update.message.text
+        users[user_id]["step"] = "payment"
 
-        USER_DATA[user_id]["step"] = "payment"
+
+        await update.message.reply_text(
+            "Detail diterima ✅"
+        )
+
+
+        await payment_menu(update.message)
+
+
+
+    elif step == "email":
+
+        order["detail"]["email"] = update.message.text
+
+        users[user_id]["step"] = "payment"
+
 
         await update.message.reply_text(
             "Email diterima ✅"
         )
 
-        await show_payment(update.message)
 
-async def payment_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await payment_menu(update.message)
+
+async def payment_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == "bank":
+
+        await query.message.reply_text(
+            BANK_INFO
+        )
+
+
+    elif query.data == "tng":
+
+        await query.message.reply_text(
+            "🟩 QR Touch 'n Go\n\n"
+            "Sila scan QR dan hantar bukti bayaran."
+        )
+
+        # Nanti letak gambar QR TNG di sini
+
+
+    elif query.data == "bisnes":
+
+        await query.message.reply_text(
+            "🟦 QR Bisnes\n\n"
+            "Sila scan QR dan hantar bukti bayaran."
+        )
+
+        # Nanti letak gambar QR Bisnes di sini
+
+
+
+async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.message.from_user.id
 
-    if user_id not in USER_DATA:
+    if user_id not in users:
         return
 
 
-    data = USER_DATA[user_id]
+    step = users[user_id]["step"]
+
+    order = orders[users[user_id]["order"]]
 
 
-    text = f"""
-🔔 ORDER BARU
+    if step == "name":
 
-🧾 ID Order: #{data['order']}
+        order["detail"]["name"] = update.message.text
 
-Produk: {data['product']}
-Harga: RM{data['price']}
-
-Nama: {data.get('name','-')}
-PIN: {data.get('pin','-')}
-Email: {data.get('email','-')}
-
-Customer ID:
-{user_id}
-
-Status:
-Menunggu semakan bayaran
-"""
+        users[user_id]["step"] = "pin"
 
 
-    await context.bot.send_message(
-        chat_id=OWNER_ID,
-        text=text
-    )
-
-
-    await update.message.reply_text(
-        "✅ Bukti bayaran diterima.\n\n"
-        "Order sedang disemak oleh admin."
-    )
-
-
-
-def main():
-
-    app = Application.builder().token(TOKEN).build()
-
-
-    app.add_handler(
-        CommandHandler(
-            "start",
-            start
+        await update.message.reply_text(
+            "Sila masukkan PIN 4 digit:"
         )
-    )
 
 
-    app.add_handler(
-        CallbackQueryHandler(
-            products,
-            pattern="products"
+    elif step == "pin":
+
+        order["detail"]["pin"] = update.message.text
+
+        users[user_id]["step"] = "payment"
+
+
+        await update.message.reply_text(
+            "Detail diterima ✅"
         )
-    )
 
 
-    app.add_handler(
-        CallbackQueryHandler(
-            choose_product
+        await payment_menu(update.message)
+
+
+
+    elif step == "email":
+
+        order["detail"]["email"] = update.message.text
+
+        users[user_id]["step"] = "payment"
+
+
+        await update.message.reply_text(
+            "Email diterima ✅"
         )
-    )
 
 
-    app.add_handler(
-        CallbackQueryHandler(
-            payment_choice,
-            pattern="bank|tng|bisnes"
-        )
-    )
-
-
-    app.add_handler(
-        MessageHandler(
-            filters.TEXT & ~filters.COMMAND,
-            user_text
-        )
-    )
-
-
-    app.add_handler(
-        MessageHandler(
-            filters.PHOTO,
-            payment_proof
-        )
-    )
-
-
-    print("BOT ONLINE")
-
-    await app.run_polling()
-
-
-
-if __name__ == "__main__":
-    import asyncio
-    asyncio.run(main())
+        await payment_menu(update.message)
