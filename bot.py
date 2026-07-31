@@ -238,7 +238,6 @@ if step == "name":
     )
 
     USER_DATA[user_id]["step"] = "pin"
-    )
 
     USER_DATA[user_id]["step"] = "pin"
 
